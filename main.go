@@ -1,64 +1,68 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 )
 
-// Initialize
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
-// Create the websocket variable
-var clients []websocket.Conn
-
-func main() {
-	// Create endpoint for websocket connection
-	http.HandleFunc("/echo", func(w http.ResponseWriter, r *http.Request) {
-		// Initialize configs
-		conn, err := upgrader.Upgrade(w, r, nil)
+func reader(conn *websocket.Conn) {
+	for {
+		messageType, message, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("Error in [upgrader.Upgrade]: %v", err)
+			log.Printf("Error in [conn.ReadMessage]: %v", err)
 			return
 		}
 
-		clients = append(clients, *conn)
-
-		// Loop if client send to server
-		for {
-			msgType, msg, err := conn.ReadMessage()
-			if err != nil {
-				log.Printf("Error in [ReadMessage]: %v", err)
-				return
-			}
-
-			fmt.Printf("%s send: %s\n", conn.RemoteAddr(), string(msg))
-
-			// Loop if message found and send again to client for
-			// write in your browser
-			for _, client := range clients {
-				err = client.WriteMessage(msgType, msg)
-				if err != nil {
-
-					return
-				}
-
-			}
+		err = conn.WriteMessage(messageType, message)
+		if err != nil {
+			log.Printf("Error in [WriteMessage]: %v", err)
+			return
 		}
 
-	})
+	}
+}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "index.html")
-		// w,r is write and delete
-	})
+func homePage(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "index.html")
+}
 
-	fmt.Println("Your server run 8182")
-	err := http.ListenAndServe(":8182", nil)
+func ws(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("Error in [upgrader.Upgrade]: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Println("===================================")
+	log.Println("== CLIENT SUCCESSFULLY CONNECTED ==")
+	log.Println("===================================")
+
+	reader(conn)
+}
+
+func setupRoutes() {
+	http.HandleFunc("/", homePage)
+	http.HandleFunc("/ws", ws)
+}
+
+func main() {
+	setupRoutes()
+
+	log.Println("=======================")
+	log.Println("== RUNNING SERVER... ==")
+	log.Println("=======================")
+
+	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		log.Fatalf("Error in [ListenAndServe]: %v", err)
 		return

@@ -16,7 +16,7 @@
 <script>
    let input = document.getElementById('input')
    let output = document.getElementById('output')
-   let socket = new WebSocket("ws://10.0.11.41:8182/echo")
+   let socket = new WebSocket("ws://10.0.11.41:8080/ws")
 
     output.classList.add("new-class")
     socket.onopen = function(){
