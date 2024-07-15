@@ -2,35 +2,133 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #chat {
+            width: 50%;
+            max-width: 600px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        #messages {
+            list-style-type: none;
+            padding: 0;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        #messages li {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        #messages li.sent {
+            text-align: right;
+            background-color: #e0ffe0;
+        }
+        #messages li.received {
+            text-align: left;
+            background-color: #e0e0ff;
+        }
+        #typing {
+            margin-bottom: 20px;
+            font-style: italic;
+            color: #666;
+        }
+        #input {
+            display: flex;
+        }
+        #input input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        #input button {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+        }
+        #input button:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body>
-    <h1>Websocket Golang</h1>
-
-<div class="content">
-    <input type="text" id="input">
-    <button onclick="send()">send message</button>
+<div id="chat">
+    <ul id="messages"></ul>
+    <div id="typing"></div>
+    <div id="input">
+        <input type="text" id="message" placeholder="Type a message..." oninput="showTyping()" />
+        <button onclick="sendMessage()">Send</button>
+    </div>
 </div>
-    <pre id="output"></pre>
-</body>
+
 <script>
-   let input = document.getElementById('input')
-   let output = document.getElementById('output')
-   let socket = new WebSocket("ws://10.0.11.41:8080/ws")
+    const ws = new WebSocket('ws://' + window.location.host + '/ws');
+    let typingTimeout;
+    let isTyping = false;
 
-    output.classList.add("new-class")
-    socket.onopen = function(){
-        output.innerHTML += "Status: Conectado\n"
+    ws.onmessage = function(event) {
+        const data = event.data.split(': ');
+        const sender = data[0];
+        const message = data.slice(1).join(': ');
+
+        if (message === 'is typing...') {
+            document.getElementById('typing').textContent = `${sender} is typing...`;
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                document.getElementById('typing').textContent = '';
+            }, 3000);
+        } else {
+            addMessage(message, 'received', sender);
+            document.getElementById('typing').textContent = '';
+        }
+    };
+
+    function sendMessage() {
+        const input = document.getElementById('message');
+        if (input.value) {
+            const message = input.value;
+            ws.send(message);
+            input.value = '';
+            isTyping = false; // Reset typing status after sending message
+        }
     }
 
-    socket.onmessage = function(e){
-        output.innerHTML += "Message: " + e.data + "\n"
+    function showTyping() {
+        if (!isTyping) {
+            isTyping = true;
+            ws.send('is typing...');
+            typingTimeout = setTimeout(() => {
+                isTyping = false;
+            }, 3000);
+        }
     }
 
-    function send() {
-        socket.send(input.value)
-
-        input.value = ""
+    function addMessage(message, type, sender) {
+        const messages = document.getElementById('messages');
+        const messageElement = document.createElement('li');
+        messageElement.textContent = `${sender}: ${message}`;
+        messageElement.className = type;
+        messages.appendChild(messageElement);
+        messages.scrollTop = messages.scrollHeight; // Scroll to the bottom
     }
 </script>
+</body>
 </html>
