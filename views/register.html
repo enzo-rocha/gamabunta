@@ -93,17 +93,17 @@
 </head>
 <body>
 <div class="register-container">
-    <div class="register-title">Register</div>
+    <div class="register-title">Cadastro</div>
     <form id="register-form">
         <div class="form-group">
-            <label for="username">Username:</label>
-            <input type="text" id="username" name="username">
+            <label for="email">E-mail:</label>
+            <input type="text" id="email" name="email">
         </div>
         <div class="form-group">
-            <label for="password">Password:</label>
+            <label for="password">Senha:</label>
             <input type="password" id="password" name="password">
         </div>
-        <button type="submit" class="submit-btn">Register</button>
+        <button type="submit" class="submit-btn">Cadastrar</button>
     </form>
     <div id="register-result" class="register-result"></div>
 </div>
@@ -113,17 +113,23 @@
         const registerForm = document.getElementById('register-form');
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
 
-            const response = await fetch('/register', {
+            const response = await fetch('/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ email, password })
             });
 
-            const result = await response.text();
-            document.getElementById('register-result').textContent = result;
+            if (response.ok) {
+                window.location.href = "/login";
+            } else {
+                const result = await response.text();
+                document.getElementById('register-result').textContent = result;
+            }
+
+
         });
     });
 </script>

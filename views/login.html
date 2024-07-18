@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
     <style>
-        /* Reset de estilos e configurações básicas */
         * {
             margin: 0;
             padding: 0;
@@ -96,11 +95,11 @@
     <div class="login-title">Login</div>
     <form id="login-form">
         <div class="form-group">
-            <label for="username">Username:</label>
-            <input type="text" id="username" name="username">
+            <label for="email">E-mail:</label>
+            <input type="text" id="email" name="email">
         </div>
         <div class="form-group">
-            <label for="password">Password:</label>
+            <label for="password">Senha:</label>
             <input type="password" id="password" name="password">
         </div>
         <button type="submit" class="submit-btn">Login</button>
@@ -113,17 +112,21 @@
         const loginForm = document.getElementById('login-form');
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
 
-            const response = await fetch('/login', {
+            const response = await fetch('/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ email, password })
             });
 
-            const result = await response.text();
-            document.getElementById('login-result').textContent = result;
+            if (response.ok) {
+                window.location.href = "/home";
+            } else {
+                const result = await response.text();
+                document.getElementById('login-result').textContent = result;
+            }
         });
     });
 </script>

@@ -20,8 +20,15 @@ func main() {
 
 	controllers.InitDB(db)
 
-	http.HandleFunc("/login", controllers.Login)
-	http.HandleFunc("/register", controllers.Register)
+	// Routes
+	http.HandleFunc("/", controllers.LoginPage)
+	http.HandleFunc("/login", controllers.LoginPage)
+	http.HandleFunc("/register", controllers.RegisterPage)
+	http.HandleFunc("/home", controllers.HomePage)
+
+	// Functions
+	http.HandleFunc("/auth/login", controllers.Login)
+	http.HandleFunc("/auth/register", controllers.Register)
 
 	log.Println("Server running on port 8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

@@ -1,78 +1,151 @@
 package controllers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"gamabunta/models"
 	"gamabunta/utils"
-	"html/template"
+	"io"
 	"log"
 	"net/http"
+	"net/mail"
+	"net/smtp"
 )
 
-var db *sql.DB
-
-func InitDB(database *sql.DB) {
-	db = database
-}
-
 func Login(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		tmpl, _ := template.ParseFiles("views/login.html")
-		tmpl.Execute(w, nil)
+	ctx := r.Context()
+
+	// language=sql
+	query := `
+	SELECT password 
+	FROM user 
+	WHERE username = ?
+	`
+
+	var credentials models.Credentials
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Error in [ReadAll]: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	var creds models.Credentials
-	err := json.NewDecoder(r.Body).Decode(&creds)
+	err = json.Unmarshal(body, &credentials)
 	if err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		log.Printf("Error in [Unmarshal]: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	var storedPassword string
-	err = db.QueryRow("SELECT password FROM user WHERE username=?", creds.Username).Scan(&storedPassword)
+
+	err = db.QueryRowContext(ctx, query, credentials.Email).Scan(&storedPassword)
 	if err != nil {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		http.Error(w, "Credenciais inválidas.", http.StatusUnauthorized)
 		return
 	}
 
-	if utils.CheckPasswordHash(creds.Password, storedPassword) {
-		w.Write([]byte("Login successful"))
-	} else {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+	valid := utils.CheckPasswordHash(credentials.Password, storedPassword)
+
+	if !valid {
+		http.Error(w, "Credenciais inválidas.", http.StatusUnauthorized)
 		return
 	}
+
+	http.Redirect(w, r, "/home", http.StatusSeeOther)
 }
 
 func Register(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		tmpl, _ := template.ParseFiles("views/register.html")
-		tmpl.Execute(w, nil)
-		return
-	}
+	ctx := r.Context()
 
-	var creds models.Credentials
-	err := json.NewDecoder(r.Body).Decode(&creds)
+	// language=sql
+	query := `
+	INSERT INTO user (username, password)
+	VALUES (?, ?)
+	`
+
+	var credentials models.Credentials
+
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		log.Printf("Error in [ReadAll]: %v", err)
 		return
 	}
 
-	hashedPassword, err := utils.HashPassword(creds.Password)
+	err = json.Unmarshal(body, &credentials)
 	if err != nil {
-		http.Error(w, "Server error", http.StatusInternalServerError)
+		log.Printf("Error in [Unmarshal]: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	log.Println(creds.Username)
-	log.Println(creds.Password)
+	validEmail := validateEmail(credentials.Email)
 
-	_, err = db.Exec("INSERT INTO user (username, password) VALUES (?, ?)", creds.Username, hashedPassword)
+	err = sendVerificationEmail(credentials.Email)
 	if err != nil {
-		http.Error(w, "Username already taken", http.StatusBadRequest)
+		log.Printf("Error in [sendVerificationEmail]: %v", err)
 		return
 	}
 
-	w.Write([]byte("User registered successfully"))
+	if !validEmail {
+		http.Error(w, "E-mail inválido.", http.StatusUnauthorized)
+		return
+	}
+
+	hashedPassword, err := utils.HashPassword(credentials.Password)
+	if err != nil {
+		log.Printf("Error in [HashPassword]: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	_, err = db.ExecContext(ctx, query, credentials.Email, hashedPassword)
+	if err != nil {
+		log.Printf("Error in [ExecContext | query]: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	_, _ = w.Write([]byte("Cadastro realizado com sucesso!"))
+
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+func LoginPage(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "views/login.html")
+}
+
+func RegisterPage(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "views/register.html")
+}
+
+func HomePage(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "views/home.html")
+}
+
+func validateEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
+
+func sendVerificationEmail(email string) error {
+	// Configuration
+	from := "enzorocha1605@gmail.com"
+	password := "emrk azlm xpvw janh"
+	to := []string{email}
+	smtpHost := "smtp.gmail.com"
+	smtpPort := "587"
+
+	message := []byte("Obrigado por se cadastrar! Bem-vindo ao chat.")
+
+	// Create authentication
+	auth := smtp.PlainAuth("", from, password, smtpHost)
+
+	// Send actual message
+	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, to, message)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return nil
 }
